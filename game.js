@@ -35,6 +35,8 @@ let ouchText = null; // Separate text for OUCH message
 let jumpData = {
     isJumping: false,
     jumpStartTime: 0,
+    wKeyPressTime: 0, // Track when W was first pressed
+    jumpChargeTime: 0, // How long W was held
     maxHeight: 0,
     currentHeight: 0,
     leftArmMaxAngle: 0,
@@ -66,8 +68,8 @@ const BASE_ARM_FALL_SPEED = 0.3; // Ragdoll-like falling
 const ARM_GRAVITY = 0.015; // Gravity acceleration for arms
 const BASE_LEG_ROTATION_SPEED = 0.975; // 30% faster (0.75 * 1.3)
 const BASE_LEG_RETURN_SPEED = 1.17; // 30% faster (0.9 * 1.3)
-const MAX_ARM_ANGLE = 200; // degrees (arms can go past vertical and touch overhead)
-const MAX_LEG_ANGLE = 35; // degrees (legs spread)
+const MAX_ARM_ANGLE = 210; // degrees (arms can go past vertical and touch overhead)
+const MAX_LEG_ANGLE = 60; // degrees (legs spread - allow splits)
 
 // Active physics values (modified by difficulty)
 let JUMP_VELOCITY = BASE_JUMP_VELOCITY;
@@ -80,6 +82,9 @@ let LEG_RETURN_SPEED = BASE_LEG_RETURN_SPEED;
 let groundY;
 let characterGroundY;
 let targetMarkers = { left: null, right: null };
+
+// Fireworks particles
+let fireworksParticles = [];
 
 // ============================================================================
 // PHASER LIFECYCLE FUNCTIONS
@@ -166,6 +171,9 @@ function update(time, delta) {
 
     // Update animations (but not legs if in waiting_for_reset state)
     updateAnimations(delta);
+
+    // Update fireworks particles
+    updateFireworks(delta);
 }
 
 // ============================================================================
@@ -581,8 +589,8 @@ function createLeg(scene, x, y, length, isLeft) {
 
 function createTargetMarkers(scene) {
     const centerX = scene.cameras.main.width / 2;
-    const markerWidth = 30; // Smaller markers
-    const markerDistance = 60; // Closer together
+    const markerWidth = 39; // 30% wider (30 * 1.3 = 39)
+    const markerDistance = 84; // 40% further apart (60 * 1.4 = 84)
 
     // Left marker - positioned at character's foot level
     targetMarkers.left = scene.add.graphics();
@@ -599,7 +607,7 @@ function createTargetMarkers(scene) {
     targetMarkers.rightX = centerX + markerDistance;
 
     targetMarkers.tolerance = markerWidth * 0.1; // 10% tolerance (more forgiving)
-    targetMarkers.maxOvershoot = 100; // Absolute pixel distance before splits (very wide - must really go for it)
+    targetMarkers.maxOvershoot = 35; // Absolute pixel distance from marker before splits
     targetMarkers.markerWidth = markerWidth;
 }
 
@@ -654,10 +662,28 @@ function handleInput(delta) {
     }
 
     if (gameState === 'jumping') {
-        // Jump control (W key)
-        if (keys.W.isDown && character.velocity === 0 && character.container.y === character.initialY) {
-            character.velocity = JUMP_VELOCITY;
-            jumpData.jumpStartTime = Date.now();
+        // Jump control (W key) - starts immediately, continues while held
+        if (character.container.y === character.initialY && character.velocity === 0) {
+            // On ground - check if W was just pressed to start jump
+            if (keys.W.isDown && jumpData.wKeyPressTime === 0) {
+                // Start jump immediately
+                jumpData.wKeyPressTime = Date.now();
+                character.velocity = JUMP_VELOCITY * 0.3; // Initial 30% velocity
+                jumpData.jumpStartTime = Date.now();
+            }
+        } else if (character.container.y < character.initialY) {
+            // In air - apply continued upward force while W is held (if not released)
+            if (keys.W.isDown && jumpData.wKeyPressTime > 0) {
+                const holdDuration = Date.now() - jumpData.wKeyPressTime;
+                // Apply additional upward velocity while W is held (up to 300ms for 60% of original max height)
+                if (holdDuration < 300) {
+                    // Add upward force while held - shorter duration limits max height to 60%
+                    character.velocity -= 50; // Strong upward boost per frame
+                }
+            } else if (jumpData.wKeyPressTime > 0) {
+                // W was released - mark it so we don't accept W input until reset
+                jumpData.wKeyPressTime = -1; // -1 means "released, awaiting reset"
+            }
         }
 
         // Left arm (Q key)
@@ -777,6 +803,12 @@ function updateCharacterPhysics(delta) {
             character.velocity = 0;
 
             if (gameState === 'jumping') {
+                // Freeze arms in their current position
+                character.leftArm.velocity = 0;
+                character.rightArm.velocity = 0;
+                character.leftArm.isMovingUp = false;
+                character.rightArm.isMovingUp = false;
+
                 landJump();
             }
             // Splits scoring now happens in updateSplitsAnimation when animation completes
@@ -795,6 +827,12 @@ function updateAnimations(delta) {
 }
 
 function updateArmRotation(arm, delta) {
+    // Freeze arms in landing and waiting_for_reset states
+    if (gameState === 'landing' || gameState === 'waiting_for_reset') {
+        arm.container.setRotation(Phaser.Math.DegToRad(arm.angle));
+        return;
+    }
+
     // Arms swing outward: left arm goes counter-clockwise (negative), right arm goes clockwise (positive)
     const direction = arm.isLeft ? 1 : -1; // Direction for rotation
 
@@ -890,6 +928,8 @@ function startJump() {
     jumpData = {
         isJumping: true,
         jumpStartTime: Date.now(),
+        wKeyPressTime: 0,
+        jumpChargeTime: 0,
         maxHeight: 0,
         currentHeight: 0,
         leftArmMaxAngle: 0,
@@ -941,43 +981,146 @@ function trackJumpData() {
         jumpData.rightLegMaxSpread = rightLegSpread;
     }
 
-    // Check if legs went past markers (splits detection) - only check when near landing
-    if (character.container.y >= character.initialY - 20) { // Close to ground
-        const centerX = character.container.x;
-
-        // Calculate approximate foot positions based on leg angles
-        const leftLegAngleRad = Phaser.Math.DegToRad(character.leftLeg.angle);
-        const rightLegAngleRad = Phaser.Math.DegToRad(character.rightLeg.angle);
-
-        // For legs, positive angle spreads left, negative spreads right
-        const leftFootX = centerX + Math.sin(leftLegAngleRad) * 140;
-        const rightFootX = centerX + Math.sin(rightLegAngleRad) * 140;
-
-        // Check distance from markers
-        const leftDistance = Math.abs(leftFootX - targetMarkers.leftX);
-        const rightDistance = Math.abs(rightFootX - targetMarkers.rightX);
-
-        // Splits if either foot is too far from its marker (beyond maxOvershoot)
-        if (leftDistance > targetMarkers.maxOvershoot || rightDistance > targetMarkers.maxOvershoot) {
-            if (!jumpData.didSplits) {
-                jumpData.didSplits = true;
-                gameState = 'splits'; // New state for splits animation
-                ouchText.setText('OUCH!');
-                ouchText.setVisible(true);
-            }
-        }
-    }
+    // Splits detection removed from here - now happens in landJump() only once
 }
 
 function landJump() {
+    // Check for splits FIRST before changing state
+    const leftLegAngleRad = Phaser.Math.DegToRad(character.leftLeg.angle);
+    const rightLegAngleRad = Phaser.Math.DegToRad(character.rightLeg.angle);
+
+    // Calculate foot positions at landing
+    const leftFootX = (character.container.x - 15) - Math.sin(leftLegAngleRad) * 140;
+    const rightFootX = (character.container.x + 15) - Math.sin(rightLegAngleRad) * 140;
+
+    // Check distance from markers
+    const leftDistance = Math.abs(leftFootX - targetMarkers.leftX);
+    const rightDistance = Math.abs(rightFootX - targetMarkers.rightX);
+
+    console.log('SPLITS CHECK AT LANDING:', {
+        leftFootX: leftFootX,
+        rightFootX: rightFootX,
+        markerLeftX: targetMarkers.leftX,
+        markerRightX: targetMarkers.rightX,
+        leftDistance: leftDistance,
+        rightDistance: rightDistance,
+        maxOvershoot: targetMarkers.maxOvershoot,
+        leftLegAngle: character.leftLeg.angle,
+        rightLegAngle: character.rightLeg.angle
+    });
+
+    // Check if player did the splits
+    // Splits = either leg angle is beyond safe threshold (over 30 degrees)
+    const leftLegAngleAbs = Math.abs(character.leftLeg.angle);
+    const rightLegAngleAbs = Math.abs(character.rightLeg.angle);
+    const SPLITS_ANGLE_THRESHOLD = 30; // degrees
+
+    console.log('SPLITS ANGLE CHECK:', {
+        leftLegAngle: leftLegAngleAbs,
+        rightLegAngle: rightLegAngleAbs,
+        threshold: SPLITS_ANGLE_THRESHOLD
+    });
+
+    // Splits if either leg is spread beyond 30 degrees
+    if (leftLegAngleAbs > SPLITS_ANGLE_THRESHOLD || rightLegAngleAbs > SPLITS_ANGLE_THRESHOLD) {
+        console.log('SPLITS TRIGGERED!');
+        jumpData.didSplits = true;
+        gameState = 'splits'; // Change to splits state instead of landing
+        ouchText.setText('OUCH!');
+        ouchText.setVisible(true);
+        // Don't show normal landing message or score yet - splits animation will handle it
+        return;
+    }
+
     gameState = 'landing';
 
     // Show "Jump Complete" and "Press Space to Reset" messages together
     messageText.setText('Jump Complete\n\nPress Space to Reset');
     messageText.setVisible(true);
 
+    // Check for perfect landings and create fireworks
+    checkForFireworks();
+
     // Score immediately on landing
     scoreJump();
+}
+
+function checkForFireworks() {
+    const markerWidth = targetMarkers.markerWidth || 30;
+    const scene = game.scene.scenes[0];
+
+    // Calculate foot positions
+    const leftFootX = (character.container.x - 15) - Math.sin(Phaser.Math.DegToRad(character.leftLeg.angle)) * 140;
+    const rightFootX = (character.container.x + 15) - Math.sin(Phaser.Math.DegToRad(character.rightLeg.angle)) * 140;
+    const footY = characterGroundY + 5;
+
+    // Gold fireworks for feet landing in markers
+    const leftDistance = Math.abs(leftFootX - targetMarkers.leftX);
+    if (leftDistance <= markerWidth / 2) {
+        createFireworks(scene, leftFootX, footY, '#FFD700');
+    }
+
+    const rightDistance = Math.abs(rightFootX - targetMarkers.rightX);
+    if (rightDistance <= markerWidth / 2) {
+        createFireworks(scene, rightFootX, footY, '#FFD700');
+    }
+
+    // Pink fireworks for arms in perfect range (192-198 degrees)
+    const leftArmAngle = Math.abs(character.leftArm.angle);
+    const rightArmAngle = Math.abs(character.rightArm.angle);
+
+    if (leftArmAngle >= 192 && leftArmAngle <= 198 && rightArmAngle >= 192 && rightArmAngle <= 198) {
+        const shoulderY = character.initialY - 180;
+        const handY = shoulderY - 150;
+        const handX = character.container.x;
+        createFireworks(scene, handX, handY, '#FF69B4');
+    }
+}
+
+function createFireworks(scene, x, y, color) {
+    // Create 8-12 particles radiating outward
+    const particleCount = 8 + Math.floor(Math.random() * 5);
+
+    for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2;
+        const speed = 2 + Math.random() * 2;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+
+        const particle = scene.add.graphics();
+        particle.fillStyle(Phaser.Display.Color.HexStringToColor(color).color, 1);
+        particle.fillCircle(0, 0, 3);
+        particle.setPosition(x, y);
+
+        fireworksParticles.push({
+            graphics: particle,
+            x: x,
+            y: y,
+            vx: vx,
+            vy: vy,
+            life: 1.0, // 0 to 1
+            decay: 0.02 // How fast it fades
+        });
+    }
+}
+
+function updateFireworks(delta) {
+    for (let i = fireworksParticles.length - 1; i >= 0; i--) {
+        const p = fireworksParticles[i];
+
+        // Update position
+        p.x += p.vx * (delta / 16);
+        p.y += p.vy * (delta / 16);
+
+        // Apply gravity and friction
+        p.vy += 0.1 * (delta / 16);
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+
+        // Update graphics (particles persist until reset)
+        p.graphics.setPosition(p.x, p.y);
+        p.graphics.setAlpha(1.0);
+    }
 }
 
 function scoreJump() {
@@ -1022,50 +1165,49 @@ function calculateScore() {
     }
 
     // ARM SCORING (40 points max)
-    const leftArmScore = scoreArmForm(jumpData.leftArmMaxAngle);
-    const rightArmScore = scoreArmForm(jumpData.rightArmMaxAngle);
-    breakdown.arms = leftArmScore + rightArmScore;
-
-    // Symmetry bonus (5 pts)
-    const armDiff = Math.abs(jumpData.leftArmMaxAngle - jumpData.rightArmMaxAngle);
-    if (armDiff < 15) {
-        breakdown.arms += 5;
-    }
-
-    // Timing bonus (5 pts)
-    if (jumpData.leftArmPeakedInAir && jumpData.rightArmPeakedInAir) {
-        breakdown.arms += 5;
-    }
-
-    breakdown.arms = Math.min(breakdown.arms, 40);
+    const leftArmAngle = Math.abs(character.leftArm.angle);
+    const rightArmAngle = Math.abs(character.rightArm.angle);
+    const leftArmScore = scoreArmAngle(leftArmAngle);
+    const rightArmScore = scoreArmAngle(rightArmAngle);
+    breakdown.arms = Math.min(leftArmScore + rightArmScore, 40);
 
     // LEG SCORING (30 points max)
-    // Calculate foot positions - must match the leg length used in rendering
-    const leftFootX = character.container.x + Math.sin(Phaser.Math.DegToRad(character.leftLeg.angle)) * 140;
-    const rightFootX = character.container.x + Math.sin(Phaser.Math.DegToRad(character.rightLeg.angle)) * 140;
+    const leftLegBaseX = character.container.x - 15;
+    const rightLegBaseX = character.container.x + 15;
+    const leftFootX = leftLegBaseX - Math.sin(Phaser.Math.DegToRad(character.leftLeg.angle)) * 140;
+    const rightFootX = rightLegBaseX - Math.sin(Phaser.Math.DegToRad(character.rightLeg.angle)) * 140;
 
-    const leftFootScore = scoreFootLanding(leftFootX, targetMarkers.leftX);
-    const rightFootScore = scoreFootLanding(rightFootX, targetMarkers.rightX);
+    const leftLegLandingSpread = Math.abs(character.leftLeg.angle);
+    const rightLegLandingSpread = Math.abs(character.rightLeg.angle);
+
+    const leftFootScore = scoreFootLanding(leftFootX, targetMarkers.leftX, leftLegLandingSpread);
+    const rightFootScore = scoreFootLanding(rightFootX, targetMarkers.rightX, rightLegLandingSpread);
     breakdown.legs = leftFootScore + rightFootScore;
 
-    // Symmetry bonus (5 pts)
-    const legDiff = Math.abs(jumpData.leftLegMaxSpread - jumpData.rightLegMaxSpread);
-    if (legDiff < 10) {
+    // Symmetry bonus (5 points)
+    const legDiff = Math.abs(leftLegLandingSpread - rightLegLandingSpread);
+    const legsActuallyMoved = leftLegLandingSpread > 2 || rightLegLandingSpread > 2;
+    if (legDiff < 10 && legsActuallyMoved) {
         breakdown.legs += 5;
     }
-
     breakdown.legs = Math.min(breakdown.legs, 30);
 
     // HEIGHT SCORING (15 points max)
-    const heightPercent = jumpData.maxHeight / JUMP_MAX_HEIGHT;
-    if (heightPercent >= 0.8) {
+    const maxAchievableHeight = 96;
+    const heightPercent = jumpData.maxHeight / maxAchievableHeight;
+
+    if (heightPercent >= 0.95) {
         breakdown.height = 15;
-    } else if (heightPercent >= 0.6) {
-        breakdown.height = 10;
-    } else if (heightPercent >= 0.4) {
-        breakdown.height = 5;
+    } else if (heightPercent >= 0.75) {
+        breakdown.height = 12;
+    } else if (heightPercent >= 0.55) {
+        breakdown.height = 9;
+    } else if (heightPercent >= 0.35) {
+        breakdown.height = 6;
+    } else if (heightPercent >= 0.15) {
+        breakdown.height = 3;
     } else {
-        breakdown.height = 2;
+        breakdown.height = 1;
     }
 
     // TIMING & COORDINATION (15 points max)
@@ -1096,45 +1238,78 @@ function calculateScore() {
     return breakdown;
 }
 
-function scoreArmForm(angle) {
-    // 20 points per arm - optimal at 180 degrees (barely touching)
-    // Reduce score if hands cross (past 180)
-    if (angle > 180) {
-        // Penalty for crossing - reduce score
-        const overshoot = angle - 180;
-        const penalty = Math.min(overshoot / 2, 15); // Max 15 point penalty
-        return Math.max(5, 20 - penalty);
-    } else if (angle >= 170) {
-        // Near perfect - hands barely touching
-        return 20;
-    } else if (angle >= 85) {
-        // Good range
-        return 15 + Math.floor((angle - 85) / 85 * 5);
-    } else if (angle >= 70) {
-        return 10 + Math.floor((angle - 70) / 15 * 5);
-    } else {
-        return Math.floor(angle / 70 * 10);
+function scoreArmAngle(angle) {
+    // Arm scoring based purely on angle
+    // 0° (down) = 0.5 pts
+    // 0° to 180°: Interpolates 1 to 10 pts
+    // 180° to 195°: Interpolates 10 to 20 pts
+    // 195° (hands meet at center): 20 pts (perfect!)
+    // 195° to 210° (max): Interpolates 20 back down to 10 pts
+
+    // Check if arm barely moved
+    if (angle < 2) {
+        return 0.5; // Straight down = 0.5 points
     }
+
+    // From 0° to 180° (down to straight up)
+    if (angle <= 180) {
+        // Interpolate from 1 pt to 10 pts
+        const progress = angle / 180;
+        return 1 + progress * 9; // 1 to 10 points
+    }
+
+    // From 180° to 195° (straight up to perfect position)
+    if (angle <= 195) {
+        // Interpolate from 10 pts to 20 pts
+        const progress = (angle - 180) / 15; // 0 to 1 over 15 degrees
+        return 10 + progress * 10; // 10 to 20 points
+    }
+
+    // From 195° to 210° (perfect position to max rotation)
+    if (angle <= 210) {
+        // Interpolate from 20 pts down to 10 pts
+        const progress = (angle - 195) / 15; // 0 to 1 over 15 degrees
+        return 20 - progress * 10; // 20 down to 10 points
+    }
+
+    // Past max rotation (shouldn't happen, but handle it)
+    return 10;
 }
 
-function scoreFootLanding(footX, targetX) {
-    const distance = Math.abs(footX - targetX);
-    const markerWidth = targetMarkers.markerWidth || 30;
+function scoreFootLanding(footX, targetX, legMaxSpread) {
+    // Simplified foot scoring based on marker bounding box
+    // Check if foot X coordinate is within the marker's bounds
 
-    // Very generous scoring - middle of sneaker on middle of marker = perfect
-    const perfectRange = markerWidth * 0.3; // Within 30% of marker width = perfect
-    const goodRange = markerWidth * 0.8; // Within 80% = good
-    const okayRange = markerWidth * 1.5; // Within 150% = okay
+    const markerWidth = targetMarkers.markerWidth || 39;
+    const markerHalfWidth = markerWidth / 2;
 
-    if (distance <= perfectRange) {
-        return 15; // Perfect - middle of sneaker on middle of marker
-    } else if (distance <= goodRange) {
-        return 12; // Very good
-    } else if (distance <= okayRange) {
-        return 8; // Good
-    } else {
-        return 3; // Some credit for trying
+    // Marker bounding box
+    const markerLeft = targetX - markerHalfWidth;
+    const markerRight = targetX + markerHalfWidth;
+
+    // Check if foot is within marker bounds
+    if (footX >= markerLeft && footX <= markerRight) {
+        // Foot is inside the marker - score based on distance from center
+        const distanceFromCenter = Math.abs(footX - targetX);
+        const maxDistanceInMarker = markerHalfWidth;
+
+        // Perfect center = 15 pts, edge of marker = 10 pts
+        // Linear interpolation
+        const score = 15 - (distanceFromCenter / maxDistanceInMarker) * 5;
+        return Math.max(score, 10); // Clamp to minimum 10 if inside marker
     }
+
+    // Foot is outside marker - score based on how far outside
+    const distanceOutside = footX < markerLeft ?
+        (markerLeft - footX) : (footX - markerRight);
+
+    // Outside by 0-30 pixels: interpolate from 9 down to 1
+    if (distanceOutside <= 30) {
+        return 9 - (distanceOutside / 30) * 8; // 9 down to 1
+    }
+
+    // Very far outside = minimum score
+    return 0.5;
 }
 
 function resetCharacter() {
@@ -1149,6 +1324,12 @@ function resetCharacter() {
     // Hide both messages
     messageText.setVisible(false);
     ouchText.setVisible(false);
+
+    // Clear all fireworks particles
+    for (let i = fireworksParticles.length - 1; i >= 0; i--) {
+        fireworksParticles[i].graphics.destroy();
+    }
+    fireworksParticles = [];
 
     // Reset character position
     character.container.y = character.initialY;
@@ -1311,9 +1492,9 @@ document.addEventListener('DOMContentLoaded', () => {
         isHardMode = e.target.checked;
 
         if (isHardMode) {
-            difficultyMultiplier = 1.5;
+            difficultyMultiplier = 2.0;
             difficultyText.textContent = 'Hard Mode';
-            // Apply hard mode speeds
+            // Apply hard mode speeds (2x multiplier)
             JUMP_VELOCITY = BASE_JUMP_VELOCITY * difficultyMultiplier;
             ARM_ROTATION_SPEED = BASE_ARM_ROTATION_SPEED * difficultyMultiplier;
             ARM_FALL_SPEED = BASE_ARM_FALL_SPEED * difficultyMultiplier;
