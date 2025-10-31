@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jumping Dev - Jumping Jack Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Left Panel - Score Display -->
+        <div class="left-panel panel">
+            <div class="score-header">
+                <h2>JUMPING DEV</h2>
+            </div>
+            <div class="difficulty-toggle">
+                <label class="toggle-label">
+                    <span class="difficulty-text" id="difficultyText">Easy Mode</span>
+                    <input type="checkbox" id="difficultyToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="score-display">
+                <div class="score-main">
+                    <div class="score-line">SCORE: <span id="totalScore">0</span> / 1000</div>
+                    <div class="score-line">Jump: <span id="currentJump">0</span>/10</div>
+                    <div class="score-line">Last: <span id="lastScore">-</span> <span id="lastStars"></span></div>
+                </div>
+            </div>
+            <div class="breakdown-display">
+                <div class="breakdown-header">LAST JUMP BREAKDOWN:</div>
+                <div class="breakdown-item">
+                    <span class="breakdown-label">Arms:</span>
+                    <div class="progress-bar"><div class="progress-fill" id="armsProgress"></div></div>
+                    <span class="breakdown-value" id="armsValue">-/40</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="breakdown-label">Legs:</span>
+                    <div class="progress-bar"><div class="progress-fill" id="legsProgress"></div></div>
+                    <span class="breakdown-value" id="legsValue">-/30</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="breakdown-label">Height:</span>
+                    <div class="progress-bar"><div class="progress-fill" id="heightProgress"></div></div>
+                    <span class="breakdown-value" id="heightValue">-/15</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="breakdown-label">Timing:</span>
+                    <div class="progress-bar"><div class="progress-fill" id="timingProgress"></div></div>
+                    <span class="breakdown-value" id="timingValue">-/15</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center - Game Canvas -->
+        <div id="game-area"></div>
+
+        <!-- Right Panel - Controls & Help -->
+        <div class="right-panel panel">
+            <div class="controls-section">
+                <h3>🎮 CONTROLS</h3>
+                <div class="control-item"><kbd>W</kbd> Jump<br><span class="hint">Hold for height</span></div>
+                <div class="control-item"><kbd>Q</kbd> Left Arm Up</div>
+                <div class="control-item"><kbd>E</kbd> Right Arm Up</div>
+                <div class="control-item"><kbd>Z</kbd> Left Leg Out<br><span class="hint">(while jumping)</span></div>
+                <div class="control-item"><kbd>X</kbd> Right Leg Out<br><span class="hint">(while jumping)</span></div>
+            </div>
+
+            <div class="objective-section">
+                <h3>🎯 OBJECTIVE</h3>
+                <p>Complete 10 jumps doing your best jumping jacks!</p>
+                <p class="goal">🎖️ Goal: 1000 pts</p>
+                <p class="goal">⭐ Perfect: 100/jump</p>
+            </div>
+
+            <div class="tips-section">
+                <h3>💡 QUICK TIPS</h3>
+                <ul>
+                    <li>Raise arms high</li>
+                    <li>Spread legs wide</li>
+                    <li>Land on targets</li>
+                    <li>Time it right!</li>
+                </ul>
+            </div>
+
+            <button class="help-button" id="helpButton">❓ FULL RULES</button>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeModal">&times;</span>
+            <h2>📖 JUMPING DEV - RULES</h2>
+
+            <div class="help-section">
+                <h3>HOW TO PLAY:</h3>
+                <p>Perform 10 jumping jacks using keyboard controls. Each jump is scored out of 100 points based on form.</p>
+            </div>
+
+            <div class="help-section">
+                <h3>CONTROLS:</h3>
+                <p><kbd>W</kbd> - Jump (hold to jump higher, max ~2 feet)</p>
+                <p><kbd>Q</kbd> - Swing left arm up (release to drop)</p>
+                <p><kbd>E</kbd> - Swing right arm up (release to drop)</p>
+                <p><kbd>Z</kbd> - Spread left leg (only works while airborne)</p>
+                <p><kbd>X</kbd> - Spread right leg (only works while airborne)</p>
+            </div>
+
+            <div class="help-section">
+                <h3>SCORING BREAKDOWN:</h3>
+                <p><strong>🦾 Arm Form (40 pts):</strong></p>
+                <ul>
+                    <li>Both arms raised >85° vertical: 20 pts each</li>
+                    <li>Symmetry bonus: +5 pts if arms move together</li>
+                    <li>Timing: +5 pts if arms peak before landing</li>
+                </ul>
+
+                <p><strong>🦵 Leg Spread (30 pts):</strong></p>
+                <ul>
+                    <li>Land on target markers: 15 pts per foot</li>
+                    <li>Symmetry: +5 pts if legs spread evenly</li>
+                    <li>⚠️ Warning: Landing >15% past targets = SPLITS! (0 pts)</li>
+                </ul>
+
+                <p><strong>⬆️ Jump Height (15 pts):</strong></p>
+                <ul>
+                    <li>Reach 80%+ of max height for full points</li>
+                </ul>
+
+                <p><strong>⏱️ Timing (15 pts):</strong></p>
+                <ul>
+                    <li>All 4 limbs moved: 5 pts</li>
+                    <li>Arms peaked while airborne: 5 pts</li>
+                    <li>Legs spread at jump apex: 5 pts</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h3>STAR RATINGS:</h3>
+                <p>⭐⭐⭐⭐ 90-100 pts - PERFECT!</p>
+                <p>⭐⭐⭐ 70-89 pts - Great!</p>
+                <p>⭐⭐ 50-69 pts - Good</p>
+                <p>⭐ 25-49 pts - Okay</p>
+                <p>0-24 pts - Keep trying!</p>
+            </div>
+
+            <div class="help-section">
+                <h3>GAME FLOW:</h3>
+                <ol>
+                    <li>Press any control key to start</li>
+                    <li>Perform your jumping jack</li>
+                    <li>After landing, wait 2 seconds for scoring</li>
+                    <li>Character resets to start position</li>
+                    <li>Repeat for 10 total jumps</li>
+                    <li>View final score and grade!</li>
+                </ol>
+            </div>
+
+            <div class="help-section">
+                <h3>TIPS FOR SUCCESS:</h3>
+                <ul>
+                    <li>Coordinate all 5 keys - it's challenging!</li>
+                    <li>Arms fall with gravity when released</li>
+                    <li>Legs only spread while in the air</li>
+                    <li>Watch the target markers for landing</li>
+                    <li>Timing is everything - practice makes perfect!</li>
+                </ul>
+            </div>
+
+            <p class="modal-footer">Press ESC or click × to close</p>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content game-over-content">
+            <h2>🎉 GAME COMPLETE!</h2>
+            <div class="final-score">
+                <p class="big-score">Final Score: <span id="finalScore">0</span> / 1000</p>
+                <div class="progress-bar-large">
+                    <div class="progress-fill-large" id="finalProgress"></div>
+                </div>
+                <p class="percentage" id="finalPercentage">0%</p>
+                <h3 class="grade" id="finalGrade">-</h3>
+            </div>
+            <div class="stats">
+                <p>Perfect Jumps: <span id="perfectJumps">0</span></p>
+                <p>Best Jump: <span id="bestJump">0</span> pts</p>
+                <p>Average: <span id="averageScore">0</span> pts</p>
+            </div>
+            <button class="restart-button" id="restartButton">Press SPACE to Restart</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
