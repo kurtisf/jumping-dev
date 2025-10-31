@@ -150,7 +150,7 @@ function create() {
     const footerText = this.add.text(
         this.cameras.main.width / 2,
         this.cameras.main.height - 15,
-        'Made 100% with Claude Code. Click here for the code',
+        'Made 100% with Claude Code. View source code on GitHub',
         {
             fontSize: '14px',
             fontFamily: 'Arial',
