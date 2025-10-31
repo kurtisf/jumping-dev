@@ -223,9 +223,44 @@ kbd {
 }
 
 .hint {
-    font-size: 12px;
+    font-size: 11px;
     color: #aaa;
     font-style: italic;
+    display: block;
+    margin-top: 2px;
+}
+
+/* Keyboard Layout */
+.keyboard-layout {
+    margin: 15px 0;
+}
+
+.key-row {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    gap: 30px;
+}
+
+.key-row-centered {
+    justify-content: center;
+    gap: 30px;
+}
+
+.key-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 5px;
+}
+
+.key-label {
+    font-size: 12px;
+    color: #fff;
+    font-weight: bold;
+    display: block;
 }
 
 .objective-section p {

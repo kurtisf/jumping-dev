@@ -146,6 +146,32 @@ function create() {
     messageText.setOrigin(0.5, 0.5);
     messageText.setVisible(false);
 
+    // Create footer text at bottom of game area
+    const footerText = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height - 15,
+        'Made 100% with Claude Code. View source code on GitHub',
+        {
+            fontSize: '14px',
+            fontFamily: 'Arial',
+            color: '#FFFFFF',
+            alpha: 0.7
+        }
+    );
+    footerText.setOrigin(0.5, 1);
+
+    // Make the entire footer text clickable (simulate link appearance)
+    footerText.setInteractive({ useHandCursor: true });
+    footerText.on('pointerover', () => {
+        footerText.setColor('#00ff88');
+    });
+    footerText.on('pointerout', () => {
+        footerText.setColor('#FFFFFF');
+    });
+    footerText.on('pointerdown', () => {
+        window.open('https://github.com/kurtisf/jumping-dev', '_blank');
+    });
+
     // Initialize UI
     updateScoreDisplay();
 }

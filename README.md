@@ -1,6 +1,10 @@
 # Jumping Dev - Jumping Jack Simulator 🎮
 
+Note: This entire project was created with Claude Code for VS Code. I did not type a line of source code, add any comments directly or modify any files. I even told Claude to update the readme with this text! I did spend some time in the Chrome Dev Tools debugging some of the math calculations for the game. Everything else was prompted.
+
 A fun and challenging HTML5 browser game where you perform jumping jacks using keyboard controls. Built with Phaser 3 and designed for static hosting.
+
+You can play the game live here: https://kurtisf.github.io/jumping-dev/
 
 ## 🚀 Quick Start
 
@@ -34,20 +38,20 @@ Perform 10 jumping jacks as accurately as possible. Each jump is scored out of 1
 **Goal:** Achieve 1000 points total!
 
 ### Controls
-- **W** - Jump (hold to jump higher, max ~2 feet)
+- **W** - Jump (hold to jump higher)
 - **Q** - Swing left arm up (release to let it fall)
 - **E** - Swing right arm up (release to let it fall)
 - **Z** - Spread left leg (only works while in the air)
 - **X** - Spread right leg (only works while in the air)
-- **H** - Toggle help modal
+- **H** - Open/close help modal
 - **ESC** - Close modals
-- **SPACE** - Restart game (after completion)
+- **SPACE** - Continue to next jump / Restart game (after completion)
 
 ### Tips for Success
 - Coordinate all 5 keys - it's intentionally challenging!
-- Raise arms high (>85° for full points)
+- Raise arms as high as possible (overhead = best score)
 - Land your feet on the target markers
-- Spread legs while in the air
+- Spread legs while in the air, but not too wide (>30° = splits!)
 - Arms fall with gravity - time your releases!
 
 ## 📁 Project Structure
@@ -210,22 +214,23 @@ Change the color theme in `styles.css`:
 ### Breakdown
 
 **Arms (40 points):**
-- 20 pts per arm for >85° vertical
-- +5 pts for symmetry (both arms within 15° of each other)
-- +5 pts if arms peaked before landing
+- Up to 20 pts per arm based on angle
+- Best score: arms meet overhead at center (195°)
+- Scoring increases smoothly from down (0°) to overhead
 
 **Legs (30 points):**
-- 15 pts per foot for landing on target markers
+- Up to 15 pts per foot for landing on target markers
 - +5 pts for symmetrical leg spread
+- ⚠️ Warning: Spreading legs >30° triggers SPLITS (only 4 pts total)
 
 **Height (15 points):**
-- 15 pts for reaching 80%+ of max height
-- Scaled scoring for lower jumps
+- 15 pts for reaching 95%+ of max height
+- Scaled scoring for lower jumps (12/9/6/3/1 pts)
 
 **Timing (15 points):**
 - 5 pts for moving all 4 limbs
 - 5 pts for arms peaking while airborne
-- 5 pts for legs spreading at jump apex
+- 5 pts for legs spreading well (>20° each)
 
 ### Star Ratings
 - ⭐⭐⭐⭐ (90-100 pts) - PERFECT!

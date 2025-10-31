@@ -60,11 +60,37 @@
         <div class="right-panel panel">
             <div class="controls-section">
                 <h3>🎮 CONTROLS</h3>
-                <div class="control-item"><kbd>W</kbd> Jump<br><span class="hint">Hold for height</span></div>
-                <div class="control-item"><kbd>Q</kbd> Left Arm Up</div>
-                <div class="control-item"><kbd>E</kbd> Right Arm Up</div>
-                <div class="control-item"><kbd>Z</kbd> Left Leg Out<br><span class="hint">(while jumping)</span></div>
-                <div class="control-item"><kbd>X</kbd> Right Leg Out<br><span class="hint">(while jumping)</span></div>
+                <div class="keyboard-layout">
+                    <!-- Top row: Q W E -->
+                    <div class="key-row">
+                        <div class="key-group">
+                            <kbd>Q</kbd>
+                            <span class="key-label">Left Arm</span>
+                        </div>
+                        <div class="key-group">
+                            <kbd>W</kbd>
+                            <span class="key-label">Jump</span>
+                            <span class="hint">Hold for height</span>
+                        </div>
+                        <div class="key-group">
+                            <kbd>E</kbd>
+                            <span class="key-label">Right Arm</span>
+                        </div>
+                    </div>
+                    <!-- Bottom row: Z X (centered) -->
+                    <div class="key-row key-row-centered">
+                        <div class="key-group">
+                            <kbd>Z</kbd>
+                            <span class="key-label">Left Leg</span>
+                            <span class="hint">(while jumping)</span>
+                        </div>
+                        <div class="key-group">
+                            <kbd>X</kbd>
+                            <span class="key-label">Right Leg</span>
+                            <span class="hint">(while jumping)</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="objective-section">
@@ -101,27 +127,55 @@
 
             <div class="help-section">
                 <h3>CONTROLS:</h3>
-                <p><kbd>W</kbd> - Jump (hold to jump higher, max ~2 feet)</p>
-                <p><kbd>Q</kbd> - Swing left arm up (release to drop)</p>
-                <p><kbd>E</kbd> - Swing right arm up (release to drop)</p>
-                <p><kbd>Z</kbd> - Spread left leg (only works while airborne)</p>
-                <p><kbd>X</kbd> - Spread right leg (only works while airborne)</p>
+                <div class="keyboard-layout">
+                    <!-- Top row: Q W E -->
+                    <div class="key-row">
+                        <div class="key-group">
+                            <kbd>Q</kbd>
+                            <span class="key-label">Left Arm Up</span>
+                            <span class="hint">(release to drop)</span>
+                        </div>
+                        <div class="key-group">
+                            <kbd>W</kbd>
+                            <span class="key-label">Jump</span>
+                            <span class="hint">(hold to jump higher)</span>
+                        </div>
+                        <div class="key-group">
+                            <kbd>E</kbd>
+                            <span class="key-label">Right Arm Up</span>
+                            <span class="hint">(release to drop)</span>
+                        </div>
+                    </div>
+                    <!-- Bottom row: Z X (centered) -->
+                    <div class="key-row key-row-centered">
+                        <div class="key-group">
+                            <kbd>Z</kbd>
+                            <span class="key-label">Left Leg Out</span>
+                            <span class="hint">(while airborne)</span>
+                        </div>
+                        <div class="key-group">
+                            <kbd>X</kbd>
+                            <span class="key-label">Right Leg Out</span>
+                            <span class="hint">(while airborne)</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="help-section">
                 <h3>SCORING BREAKDOWN:</h3>
                 <p><strong>🦾 Arm Form (40 pts):</strong></p>
                 <ul>
-                    <li>Both arms raised >85° vertical: 20 pts each</li>
-                    <li>Symmetry bonus: +5 pts if arms move together</li>
-                    <li>Timing: +5 pts if arms peak before landing</li>
+                    <li>Raise arms as high as possible (up to 20 pts each)</li>
+                    <li>Best score: arms meet overhead at center (195°)</li>
+                    <li>Scoring increases from down (0°) to overhead (195°)</li>
                 </ul>
 
                 <p><strong>🦵 Leg Spread (30 pts):</strong></p>
                 <ul>
-                    <li>Land on target markers: 15 pts per foot</li>
+                    <li>Land on target markers: up to 15 pts per foot</li>
                     <li>Symmetry: +5 pts if legs spread evenly</li>
-                    <li>⚠️ Warning: Landing >15% past targets = SPLITS! (0 pts)</li>
+                    <li>⚠️ Warning: Spreading legs >30° = SPLITS! (4 pts total)</li>
                 </ul>
 
                 <p><strong>⬆️ Jump Height (15 pts):</strong></p>
@@ -151,8 +205,8 @@
                 <ol>
                     <li>Press any control key to start</li>
                     <li>Perform your jumping jack</li>
-                    <li>After landing, wait 2 seconds for scoring</li>
-                    <li>Character resets to start position</li>
+                    <li>After landing, view your score immediately</li>
+                    <li>Press SPACE to reset and continue</li>
                     <li>Repeat for 10 total jumps</li>
                     <li>View final score and grade!</li>
                 </ol>
