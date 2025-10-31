@@ -160,7 +160,7 @@ function create() {
     );
     footerText.setOrigin(0.5, 1);
 
-    // Make "here" clickable (simulate link appearance)
+    // Make the entire footer text clickable (simulate link appearance)
     footerText.setInteractive({ useHandCursor: true });
     footerText.on('pointerover', () => {
         footerText.setColor('#00ff88');
